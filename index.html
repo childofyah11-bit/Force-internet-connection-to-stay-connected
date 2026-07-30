@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>forced Starlink Keeper</title>
+    <title>forced Starlink Keeper </title>
     
     <link rel="dns-prefetch" href="https://8.8.8">
     <link rel="dns-prefetch" href="https://1.1.1">
@@ -32,13 +32,13 @@
 </head>
 <body>
     <div class="container">
-        <h1>Starlink Connection Keeper <sup>ULTRA</sup></h1>
-        <p style="margin: 5px 0 15px 0; font-size: 14px; color: #8b949e;">Active Network Route & Audio Optimizer</p>
+        <h1>Starlink Connection Keeper <sup>PERSIST</sup></h1>
+        <p style="margin: 5px 0 15px 0; font-size: 14px; color: #8b949e;">Persistent Background Audio & Network Optimizer</p>
         
         <div class="status" id="status-text">Warming Sockets...</div>
         <div class="latency-badge" id="latency-text">Ping Response Time: -- ms</div>
 
-        <!-- Audio Processing Engine Panel -->
+        <!-- Audio Processing Panel -->
         <div class="panel-box">
             <div class="panel-title">🔊 Browser Media Volume Optimizer</div>
             <div class="audio-controls">
@@ -81,59 +81,63 @@
             });
         }
 
-        // Initialize advanced browser file routing hooks
+        // Register Service Worker for true offline validation pipelines
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(() => appendLog("Offline core architecture verified.", "success"))
+                    .catch(err => appendLog(`Sync warning: ${err.message}`, "info"));
+            });
+        }
+
+        // Audio Input Event Listeners
         audioFile.addEventListener('change', function() {
             const file = this.files[0];
             if (!file) return;
 
-            const fileURL = URL.createObjectURL(file);
-            mediaPlayer.src = fileURL;
+            mediaPlayer.src = URL.createObjectURL(file);
             appendLog(`Loaded audio asset: ${file.name}`, "info");
 
-            // Setup custom Web Audio API filters upon the first user upload
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 gainNode = audioCtx.createGain();
-                
-                // Route player data directly through the boost modifier graph
                 sourceNode = audioCtx.createMediaElementSource(mediaPlayer);
                 sourceNode.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
             }
         });
 
-        // Dynamic volume processing listener
         boostSlider.addEventListener('input', function() {
             const multiplier = this.value / 100;
             boostVal.innerText = `${this.value}%`;
-            
-            if (gainNode) {
-                // Adjust audio graph output coefficients smoothly
-                gainNode.gain.setValueAtTime(multiplier, audioCtx.currentTime);
-            }
+            if (gainNode) gainNode.gain.setValueAtTime(multiplier, audioCtx.currentTime);
         });
 
-        // Continuous network route maintenance engine
-        function checkLink() {
-            const startTime = performance.now();
-            fetch(`./ping.txt?t=${Date.now()}`, { cache: 'no-store' })
-                .then(res => {
-                    if (!res.ok) throw new Error();
-                    const latency = Math.round(performance.now() - startTime);
-                    latencyText.innerText = `Ping Response Time: ${latency} ms`;
-                    statusText.innerText = "Active & Maintaining Connection";
-                    statusText.style.color = "#238636";
-                    appendLog(`Pulse validated: Socket pathways hot. (${latency}ms)`, "success");
-                })
-                .catch(() => {
-                    statusText.innerText = "Connection Error / Retrying...";
-                    statusText.style.color = "#f85149";
-                    appendLog("Network drop detected. Routing retry sequence...", "fail");
-                });
-        }
+        // LOAD PERSISTENT EXTERNAL BACKGROUND WORKER FILE
+        // This targets the physical worker.js file to keep intervals awake
+        const worker = new Worker('./worker.js');
 
-        setInterval(checkLink, 10000);
-        checkLink();
+        worker.onmessage = function(e) {
+            if (e.data === 'pulse') {
+                const startTime = performance.now();
+                fetch(`./ping.txt?t=${Date.now()}`, { cache: 'no-store' })
+                    .then(res => {
+                        if (!res.ok) throw new Error();
+                        const latency = Math.round(performance.now() - startTime);
+                        latencyText.innerText = `Ping Response Time: ${latency} ms`;
+                        statusText.innerText = "Active & Maintaining Connection";
+                        statusText.style.color = "#238636";
+                        appendLog(`Persistent pulse validated. (${latency}ms)`, "success");
+                    })
+                    .catch(() => {
+                        statusText.innerText = "Connection Error / Retrying...";
+                        statusText.style.color = "#f85149";
+                        appendLog("Network drop detected by background thread.", "fail");
+                    });
+            }
+        };
+
+        appendLog("Persistent Background System initialized.", "success");
     </script>
 </body>
 </html>
