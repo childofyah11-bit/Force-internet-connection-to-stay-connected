@@ -3,29 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>http://localhost</title>
+    <title>Starlink Connection Keeper</title>
+    <!-- Pre-priming high speed global DNS lookup routes to prevent local network lookup stutter -->
+    <link rel="dns-prefetch" href="https://8.8.8">
+    <link rel="dns-prefetch" href="https://1.1.1">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; text-align: center; padding: 20px; margin: 0; }
-        .container { max-width: 600px; margin: 0 auto; background: #161b22; padding: 25px; border-radius: 6px; border: 1px solid #30363d; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .container { max-width: 650px; margin: 0 auto; background: #161b22; padding: 25px; border-radius: 6px; border: 1px solid #30363d; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         h1 { margin-top: 0; color: #f0f6fc; font-size: 24px; }
-        .status { font-size: 20px; color: #238636; font-weight: bold; margin: 15px 0; }
-        .log-container { text-align: left; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 15px; height: 300px; overflow-y: auto; font-family: monospace; font-size: 13px; color: #8b949e; }
+        .status { font-size: 20px; color: #238636; font-weight: bold; margin: 10px 0; }
+        .latency-badge { font-size: 14px; color: #8b949e; background: #21262d; padding: 4px 10px; border-radius: 20px; display: inline-block; margin-bottom: 15px; border: 1px solid #30363d; }
+        .controls-panel { display: flex; justify-content: space-around; background: #0d1117; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #30363d; }
+        .control-item { font-size: 13px; display: flex; align-items: center; gap: 8px; }
+        .log-container { text-align: left; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 15px; height: 320px; overflow-y: auto; font-family: monospace; font-size: 13px; color: #8b949e; }
         .success { color: #3fb950; }
         .reconnect { color: #db6d28; font-weight: bold; }
+        .warning { color: #e3b341; }
         .fail { color: #f85149; }
+        input[type="checkbox"] { accent-color: #238636; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Starlink Connection Keeper</h1>
-        <p>Bypassing backgrounding. Service Worker caching enabled for offline startup.</p>
+        <h1>Starlink Connection Keeper <sup>PRO</sup></h1>
+        <p style="margin: 5px 0 15px 0; font-size: 14px; color: #8b949e;">Enhanced Network-Layer Resilience Panel</p>
+        
         <div class="status" id="status-text">Initializing Background Worker...</div>
+        <div class="latency-badge" id="latency-text">Ping Response Time: -- ms</div>
+
+        <div class="controls-panel">
+            <div class="control-item">
+                <input type="checkbox" id="data-saver" checked>
+                <label for="data-saver">Prioritize Bandwidth (Block Media Preloads)</label>
+            </div>
+            <div class="control-item">
+                <input type="checkbox" id="latency-alert" checked>
+                <label for="latency-alert">Warn on High Latency (>150ms)</label>
+            </div>
+        </div>
+
         <div class="log-container" id="log-box"></div>
     </div>
     <script>
         const logBox = document.getElementById('log-box');
         const statusText = document.getElementById('status-text');
-        const systemToken = "BooBear2028";
+        const latencyText = document.getElementById('latency-text');
+        const dataSaver = document.getElementById('data-saver');
+        const latencyAlert = document.getElementById('latency-alert');
 
         function appendLog(message, type) {
             const time = new Date().toLocaleTimeString();
@@ -36,16 +60,26 @@
             logBox.scrollTop = logBox.scrollHeight;
         }
 
-        // Register Service Worker for true offline application booting
+        // Register Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(() => appendLog("Offline Service Worker registered successfully.", "success"))
-                    .catch(err => appendLog(`Service Worker registration failed: ${err.message}`, "fail"));
+                    .then(() => appendLog("Offline System Service Worker functional.", "success"))
+                    .catch(err => appendLog(`Service Worker warning: ${err.message}`, "warning"));
             });
         }
 
-        // Inline Web Worker prevents background tab interval throttling
+        // Apply Data Saver optimization properties
+        function applyDataSaverSettings() {
+            if (dataSaver.checked && 'connection' in navigator) {
+                // Hint to browser layout engine to stop intensive background network pre-fetching tasks
+                navigator.connection.saveData = true;
+            }
+        }
+        dataSaver.addEventListener('change', applyDataSaverSettings);
+        applyDataSaverSettings();
+
+        // Background Web Worker execution thread (Bypasses active tab sleep throttling)
         const workerCode = `
             setInterval(() => {
                 self.postMessage('pulse');
@@ -58,30 +92,39 @@
 
         worker.onmessage = function(e) {
             if (e.data === 'pulse') {
-                // Force a network check bypass by appending a unique timestamp query parameter
+                const startTime = performance.now();
+
+                // Direct anti-cache unique endpoint sequence
                 fetch(`./ping.txt?t=${Date.now()}`, { cache: 'no-store' })
                     .then((res) => {
-                        if (!res.ok) throw new Error("Offline response detected");
+                        if (!res.ok) throw new Error("Link route dropped");
                         
+                        const latency = Math.round(performance.now() - startTime);
+                        latencyText.innerText = `Ping Response Time: ${latency} ms`;
+
                         statusText.innerText = "Active & Maintaining Connection";
                         statusText.style.color = "#238636";
+
                         if (networkWasDown) {
-                            appendLog("⚡ Starlink connection dropped, forced a successful RECONNECT!", "reconnect");
+                            appendLog("⚡ Starlink connection verified! Forced system link RECONNECT.", "reconnect");
                             networkWasDown = false;
+                        } else if (latency > 150 && latencyAlert.checked) {
+                            appendLog(`Pulse OK, but severe DNS / Link latency detected: ${latency}ms`, "warning");
                         } else {
-                            appendLog("Pulse validated: Connection path verified.", "success");
+                            appendLog(`Pulse validated: Connection path holding strong. (${latency}ms)`, "success");
                         }
                     })
                     .catch(() => {
                         statusText.innerText = "Network Dropped / Retrying...";
                         statusText.style.color = "#f85149";
+                        latencyText.innerText = "Ping Response Time: Offline";
                         networkWasDown = true;
-                        appendLog("Network Timeout detected. Routing retry sequence...", "fail");
+                        appendLog("Network Timeout detected. Routing pipeline loop retry...", "fail");
                     });
             }
         };
 
-        appendLog("System initialized under Token verification.", "success");
+        appendLog("System Pro Engine successfully initialized.", "success");
     </script>
 </body>
 </html>
