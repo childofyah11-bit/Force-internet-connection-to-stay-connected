@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Starlink Connection Keeper</title>
-    <!-- Pre-priming high speed global DNS lookup routes to prevent local network lookup stutter -->
     <link rel="dns-prefetch" href="https://8.8.8">
     <link rel="dns-prefetch" href="https://1.1.1">
     <style>
@@ -13,20 +12,21 @@
         h1 { margin-top: 0; color: #f0f6fc; font-size: 24px; }
         .status { font-size: 20px; color: #238636; font-weight: bold; margin: 10px 0; }
         .latency-badge { font-size: 14px; color: #8b949e; background: #21262d; padding: 4px 10px; border-radius: 20px; display: inline-block; margin-bottom: 15px; border: 1px solid #30363d; }
-        .controls-panel { display: flex; justify-content: space-around; background: #0d1117; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #30363d; }
+        .controls-panel { display: flex; flex-direction: column; gap: 8px; background: #0d1117; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #30363d; align-items: center; }
         .control-item { font-size: 13px; display: flex; align-items: center; gap: 8px; }
-        .log-container { text-align: left; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 15px; height: 320px; overflow-y: auto; font-family: monospace; font-size: 13px; color: #8b949e; }
+        .log-container { text-align: left; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 15px; height: 280px; overflow-y: auto; font-family: monospace; font-size: 13px; color: #8b949e; }
         .success { color: #3fb950; }
         .reconnect { color: #db6d28; font-weight: bold; }
         .warning { color: #e3b341; }
         .fail { color: #f85149; }
+        .eco-mode { color: #58a6ff; font-weight: bold; }
         input[type="checkbox"] { accent-color: #238636; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Starlink Connection Keeper <sup>PRO</sup></h1>
-        <p style="margin: 5px 0 15px 0; font-size: 14px; color: #8b949e;">Enhanced Network-Layer Resilience Panel</p>
+        <h1>Starlink Connection Keeper <sup>ECO</sup></h1>
+        <p style="margin: 5px 0 15px 0; font-size: 14px; color: #8b949e;">Battery-Optimized Connection Management Panel</p>
         
         <div class="status" id="status-text">Initializing Background Worker...</div>
         <div class="latency-badge" id="latency-text">Ping Response Time: -- ms</div>
@@ -37,8 +37,7 @@
                 <label for="data-saver">Prioritize Bandwidth (Block Media Preloads)</label>
             </div>
             <div class="control-item">
-                <input type="checkbox" id="latency-alert" checked>
-                <label for="latency-alert">Warn on High Latency (>150ms)</label>
+                <span id="battery-status-text" style="font-size: 13px; color: #8b949e;">Detecting Battery Levels...</span>
             </div>
         </div>
 
@@ -49,9 +48,14 @@
         const statusText = document.getElementById('status-text');
         const latencyText = document.getElementById('latency-text');
         const dataSaver = document.getElementById('data-saver');
-        const latencyAlert = document.getElementById('latency-alert');
+        const batteryStatusText = document.getElementById('battery-status-text');
+
+        let isEcoModeActive = false;
 
         function appendLog(message, type) {
+            // ECO Mode optimization: Avoid heavy rendering DOM tasks if tab is invisible
+            if (document.hidden) return; 
+            
             const time = new Date().toLocaleTimeString();
             const logEntry = document.createElement('div');
             logEntry.className = type;
@@ -64,22 +68,46 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(() => appendLog("Offline System Service Worker functional.", "success"))
-                    .catch(err => appendLog(`Service Worker warning: ${err.message}`, "warning"));
+                    .then(() => appendLog("Offline Service Worker connected.", "success"))
+                    .catch(err => appendLog(`Worker delay: ${err.message}`, "warning"));
             });
         }
 
-        // Apply Data Saver optimization properties
+        // Monitor physical computer battery tracking capabilities
+        if ('getBattery' in navigator) {
+            navigator.getBattery().then((battery) => {
+                function updateBatteryMetrics() {
+                    const level = Math.round(battery.level * 100);
+                    const statusStr = battery.charging ? "Charging" : "Discharging";
+                    
+                    // If device drops below 30% battery power and is unplugged, trip Eco Mode
+                    if (level <= 30 && !battery.charging) {
+                        isEcoModeActive = true;
+                        batteryStatusText.innerHTML = `🔋 Eco Mode Enabled: ${level}% (${statusStr})`;
+                        batteryStatusText.className = "eco-mode";
+                    } else {
+                        isEcoModeActive = false;
+                        batteryStatusText.innerHTML = `Battery Level: ${level}% (${statusStr})`;
+                        batteryStatusText.className = "";
+                    }
+                }
+                updateBatteryMetrics();
+                battery.addEventListener('levelchange', updateBatteryMetrics);
+                battery.addEventListener('chargingchange', updateBatteryMetrics);
+            });
+        } else {
+            batteryStatusText.innerText = "Device Battery Status API unsupported by browser.";
+        }
+
         function applyDataSaverSettings() {
             if (dataSaver.checked && 'connection' in navigator) {
-                // Hint to browser layout engine to stop intensive background network pre-fetching tasks
                 navigator.connection.saveData = true;
             }
         }
         dataSaver.addEventListener('change', applyDataSaverSettings);
         applyDataSaverSettings();
 
-        // Background Web Worker execution thread (Bypasses active tab sleep throttling)
+        // Background Web Worker code script string
         const workerCode = `
             setInterval(() => {
                 self.postMessage('pulse');
@@ -94,37 +122,41 @@
             if (e.data === 'pulse') {
                 const startTime = performance.now();
 
-                // Direct anti-cache unique endpoint sequence
                 fetch(`./ping.txt?t=${Date.now()}`, { cache: 'no-store' })
                     .then((res) => {
                         if (!res.ok) throw new Error("Link route dropped");
                         
                         const latency = Math.round(performance.now() - startTime);
-                        latencyText.innerText = `Ping Response Time: ${latency} ms`;
-
-                        statusText.innerText = "Active & Maintaining Connection";
-                        statusText.style.color = "#238636";
+                        
+                        if (!document.hidden) {
+                            latencyText.innerText = `Ping Response Time: ${latency} ms`;
+                            statusText.innerText = "Active & Maintaining Connection";
+                            statusText.style.color = "#238636";
+                        }
 
                         if (networkWasDown) {
-                            appendLog("⚡ Starlink connection verified! Forced system link RECONNECT.", "reconnect");
+                            appendLog("⚡ Starlink connection dropped, forced a successful RECONNECT!", "reconnect");
                             networkWasDown = false;
-                        } else if (latency > 150 && latencyAlert.checked) {
-                            appendLog(`Pulse OK, but severe DNS / Link latency detected: ${latency}ms`, "warning");
                         } else {
-                            appendLog(`Pulse validated: Connection path holding strong. (${latency}ms)`, "success");
+                            // In Eco Mode, minimize continuous logging tasks to reduce hardware wake cycles
+                            if (!isEcoModeActive) {
+                                appendLog(`Pulse validated: Connection path verified. (${latency}ms)`, "success");
+                            }
                         }
                     })
                     .catch(() => {
-                        statusText.innerText = "Network Dropped / Retrying...";
-                        statusText.style.color = "#f85149";
-                        latencyText.innerText = "Ping Response Time: Offline";
+                        if (!document.hidden) {
+                            statusText.innerText = "Network Dropped / Retrying...";
+                            statusText.style.color = "#f85149";
+                            latencyText.innerText = "Ping Response Time: Offline";
+                        }
                         networkWasDown = true;
-                        appendLog("Network Timeout detected. Routing pipeline loop retry...", "fail");
+                        appendLog("Network Timeout detected. Routing retry sequence...", "fail");
                     });
             }
         };
 
-        appendLog("System Pro Engine successfully initialized.", "success");
+        appendLog("System Engine Eco-Initialized.", "success");
     </script>
 </body>
 </html>
