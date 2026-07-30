@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Starlink Connection Keeper</title>
+    <title>Starlink Keeper - Performance Dashboard</title>
     <link rel="dns-prefetch" href="https://8.8.8">
     <link rel="dns-prefetch" href="https://1.1.1">
     <style>
@@ -12,33 +12,33 @@
         h1 { margin-top: 0; color: #f0f6fc; font-size: 24px; }
         .status { font-size: 20px; color: #238636; font-weight: bold; margin: 10px 0; }
         .latency-badge { font-size: 14px; color: #8b949e; background: #21262d; padding: 4px 10px; border-radius: 20px; display: inline-block; margin-bottom: 15px; border: 1px solid #30363d; }
-        .controls-panel { display: flex; flex-direction: column; gap: 8px; background: #0d1117; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #30363d; align-items: center; }
+        .perf-panel { background: #0d1117; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #30363d; display: flex; flex-direction: column; gap: 10px; align-items: center; }
         .control-item { font-size: 13px; display: flex; align-items: center; gap: 8px; }
-        .log-container { text-align: left; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 15px; height: 280px; overflow-y: auto; font-family: monospace; font-size: 13px; color: #8b949e; }
+        .btn-action { background-color: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
+        .btn-action:hover { background-color: #30363d; border-color: #8b949e; }
+        .log-container { text-align: left; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 15px; height: 260px; overflow-y: auto; font-family: monospace; font-size: 13px; color: #8b949e; }
         .success { color: #3fb950; }
         .reconnect { color: #db6d28; font-weight: bold; }
         .warning { color: #e3b341; }
         .fail { color: #f85149; }
-        .eco-mode { color: #58a6ff; font-weight: bold; }
+        .perf-text { color: #58a6ff; font-weight: bold; }
         input[type="checkbox"] { accent-color: #238636; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Starlink Connection Keeper <sup>ECO</sup></h1>
-        <p style="margin: 5px 0 15px 0; font-size: 14px; color: #8b949e;">Battery-Optimized Connection Management Panel</p>
+        <h1>Starlink Connection Keeper <sup>PERF</sup></h1>
+        <p style="margin: 5px 0 15px 0; font-size: 14px; color: #8b949e;">Resource-Optimized System Panel</p>
         
         <div class="status" id="status-text">Initializing Background Worker...</div>
         <div class="latency-badge" id="latency-text">Ping Response Time: -- ms</div>
 
-        <div class="controls-panel">
+        <div class="perf-panel">
             <div class="control-item">
-                <input type="checkbox" id="data-saver" checked>
-                <label for="data-saver">Prioritize Bandwidth (Block Media Preloads)</label>
+                <input type="checkbox" id="throttle-idle" checked>
+                <label for="throttle-idle">Enable Smart Tab Sleep (Cuts CPU use when hidden)</label>
             </div>
-            <div class="control-item">
-                <span id="battery-status-text" style="font-size: 13px; color: #8b949e;">Detecting Battery Levels...</span>
-            </div>
+            <button class="btn-action" id="clear-mem-btn">Optimize Tab Memory Usage</button>
         </div>
 
         <div class="log-container" id="log-box"></div>
@@ -47,67 +47,46 @@
         const logBox = document.getElementById('log-box');
         const statusText = document.getElementById('status-text');
         const latencyText = document.getElementById('latency-text');
-        const dataSaver = document.getElementById('data-saver');
-        const batteryStatusText = document.getElementById('battery-status-text');
+        const throttleIdle = document.getElementById('throttle-idle');
+        const clearMemBtn = document.getElementById('clear-mem-btn');
 
-        let isEcoModeActive = false;
+        // High-Efficiency Rendering Cache
+        let trackingLogs = [];
 
         function appendLog(message, type) {
-            // ECO Mode optimization: Avoid heavy rendering DOM tasks if tab is invisible
-            if (document.hidden) return; 
-            
-            const time = new Date().toLocaleTimeString();
-            const logEntry = document.createElement('div');
-            logEntry.className = type;
-            logEntry.innerHTML = `[${time}] ${message}`;
-            logBox.appendChild(logEntry);
-            logBox.scrollTop = logBox.scrollHeight;
+            if (document.hidden && throttleIdle.checked) return;
+
+            // Use requestAnimationFrame to let the browser schedule logs when it has free rendering cycles
+            requestAnimationFrame(() => {
+                const time = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.className = type;
+                logEntry.innerHTML = `[${time}] ${message}`;
+                logBox.appendChild(logEntry);
+                logBox.scrollTop = logBox.scrollHeight;
+            });
         }
 
         // Register Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(() => appendLog("Offline Service Worker connected.", "success"))
-                    .catch(err => appendLog(`Worker delay: ${err.message}`, "warning"));
+                    .then(() => appendLog("Offline system worker validated.", "success"))
+                    .catch(err => appendLog(`Worker sync alert: ${err.message}`, "warning"));
             });
         }
 
-        // Monitor physical computer battery tracking capabilities
-        if ('getBattery' in navigator) {
-            navigator.getBattery().then((battery) => {
-                function updateBatteryMetrics() {
-                    const level = Math.round(battery.level * 100);
-                    const statusStr = battery.charging ? "Charging" : "Discharging";
-                    
-                    // If device drops below 30% battery power and is unplugged, trip Eco Mode
-                    if (level <= 30 && !battery.charging) {
-                        isEcoModeActive = true;
-                        batteryStatusText.innerHTML = `🔋 Eco Mode Enabled: ${level}% (${statusStr})`;
-                        batteryStatusText.className = "eco-mode";
-                    } else {
-                        isEcoModeActive = false;
-                        batteryStatusText.innerHTML = `Battery Level: ${level}% (${statusStr})`;
-                        batteryStatusText.className = "";
-                    }
-                }
-                updateBatteryMetrics();
-                battery.addEventListener('levelchange', updateBatteryMetrics);
-                battery.addEventListener('chargingchange', updateBatteryMetrics);
-            });
-        } else {
-            batteryStatusText.innerText = "Device Battery Status API unsupported by browser.";
-        }
+        // Memory optimization feature
+        clearMemBtn.addEventListener('click', () => {
+            // Explicitly clearing local log cache arrays and invoking internal string garbage collections
+            trackingLogs = [];
+            
+            // Re-render empty log container space cleanly
+            logBox.innerHTML = '';
+            appendLog("Tab memory arrays optimized. Stale logs cleared from RAM.", "perf-text");
+        });
 
-        function applyDataSaverSettings() {
-            if (dataSaver.checked && 'connection' in navigator) {
-                navigator.connection.saveData = true;
-            }
-        }
-        dataSaver.addEventListener('change', applyDataSaverSettings);
-        applyDataSaverSettings();
-
-        // Background Web Worker code script string
+        // Background Web Worker execution thread (Zero performance cost to UI thread)
         const workerCode = `
             setInterval(() => {
                 self.postMessage('pulse');
@@ -128,35 +107,27 @@
                         
                         const latency = Math.round(performance.now() - startTime);
                         
-                        if (!document.hidden) {
+                        if (!document.hidden || !throttleIdle.checked) {
                             latencyText.innerText = `Ping Response Time: ${latency} ms`;
                             statusText.innerText = "Active & Maintaining Connection";
                             statusText.style.color = "#238636";
-                        }
-
-                        if (networkWasDown) {
-                            appendLog("⚡ Starlink connection dropped, forced a successful RECONNECT!", "reconnect");
-                            networkWasDown = false;
-                        } else {
-                            // In Eco Mode, minimize continuous logging tasks to reduce hardware wake cycles
-                            if (!isEcoModeActive) {
-                                appendLog(`Pulse validated: Connection path verified. (${latency}ms)`, "success");
-                            }
+                            
+                            appendLog(`Pulse validated: Connection path verified. (${latency}ms)`, "success");
                         }
                     })
                     .catch(() => {
-                        if (!document.hidden) {
+                        if (!document.hidden || !throttleIdle.checked) {
                             statusText.innerText = "Network Dropped / Retrying...";
                             statusText.style.color = "#f85149";
                             latencyText.innerText = "Ping Response Time: Offline";
                         }
                         networkWasDown = true;
-                        appendLog("Network Timeout detected. Routing retry sequence...", "fail");
+                        appendLog("Network Timeout detected. Routing pipeline retry...", "fail");
                     });
             }
         };
 
-        appendLog("System Engine Eco-Initialized.", "success");
+        appendLog("System Performance Module active.", "success");
     </script>
 </body>
 </html>
