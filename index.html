@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internet Connection Keeper</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; text-align: center; padding-top: 50px; }
+        .status { font-size: 24px; color: #238636; font-weight: bold; }
+        .log { margin-top: 20px; font-size: 14px; color: #8b949e; }
+    </style>
+</head>
+<body>
+    <h1>Connection Keeper Active</h1>
+    <p>As long as this tab is open, your network activity will stay alive.</p>
+    <div class="status" id="status-text">Pinging...</div>
+    <div class="log" id="log-box"></div>
+
+    <script>
+        const logBox = document.getElementById('log-box');
+        const statusText = document.getElementById('status-text');
+
+        function keepAlive() {
+            // Using a public, CORS-enabled favicon or API endpoint to trigger a small network check
+            fetch('https://cloudflare.com', { mode: 'no-cors', cache: 'no-store' })
+                .then(() => {
+                    const time = new Date().toLocaleTimeString();
+                    statusText.innerText = "Connected & Active";
+                    logBox.innerHTML += `<div>Ping successful at ${time}</div>`;
+                })
+                .catch((err) => {
+                    statusText.innerText = "Ping Failed!";
+                    statusText.style.color = "#da3633";
+                });
+        }
+
+        // Run immediately on load, then repeat every 30 seconds
+        keepAlive();
+        setInterval(keepAlive, 30000); 
+    </script>
+</body>
+</html>
