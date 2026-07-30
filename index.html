@@ -18,17 +18,14 @@
 <body>
     <div class="container">
         <h1>Starlink Connection Keeper</h1>
-        <p>Bypassing backgrounding  Activating independent Web Workers.</p>
+        <p>Bypassing backgrounding. Service Worker caching enabled for offline startup.</p>
         <div class="status" id="status-text">Initializing Background Worker...</div>
         <div class="log-container" id="log-box"></div>
     </div>
-
     <script>
         const logBox = document.getElementById('log-box');
         const statusText = document.getElementById('status-text');
-        
-        // Safety Token Identifier
-        const systemToken = "BooBear2028"; 
+        const systemToken = "BooBear2028";
 
         function appendLog(message, type) {
             const time = new Date().toLocaleTimeString();
@@ -36,33 +33,38 @@
             logEntry.className = type;
             logEntry.innerHTML = `[${time}] ${message}`;
             logBox.appendChild(logEntry);
-            logBox.scrollTop = logBox.scrollHeight; // Scroll to bottom
+            logBox.scrollTop = logBox.scrollHeight;
         }
 
-        // 1. Create a Web Worker inline so Chrome doesn't throttle background intervals
+        // Register Service Worker for true offline application booting
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(() => appendLog("Offline Service Worker registered successfully.", "success"))
+                    .catch(err => appendLog(`Service Worker registration failed: ${err.message}`, "fail"));
+            });
+        }
+
+        // Inline Web Worker prevents background tab interval throttling
         const workerCode = `
-            let lastStateOnline = true;
             setInterval(() => {
-                // Background worker signals main window to fire network pulse
                 self.postMessage('pulse');
-            }, 10000); // 10-second rapid interval to combat Starlink micro-drops
+            }, 10000);
         `;
 
         const blob = new Blob([workerCode], { type: 'application/javascript' });
         const worker = new Worker(URL.createObjectURL(blob));
-
-        // Track state across failures
         let networkWasDown = false;
 
-        // 2. Main execution thread responds to unthrottled worker signals
         worker.onmessage = function(e) {
             if (e.data === 'pulse') {
-                // Cloudflare tracer endpoint to keep active route open
-                fetch('https://1.1.1', { mode: 'no-cors', cache: 'no-store' })
-                    .then(() => {
+                // Force a network check bypass by appending a unique timestamp query parameter
+                fetch(`./ping.txt?t=${Date.now()}`, { cache: 'no-store' })
+                    .then((res) => {
+                        if (!res.ok) throw new Error("Offline response detected");
+                        
                         statusText.innerText = "Active & Maintaining Connection";
                         statusText.style.color = "#238636";
-                        
                         if (networkWasDown) {
                             appendLog("⚡ Starlink connection dropped, forced a successful RECONNECT!", "reconnect");
                             networkWasDown = false;
