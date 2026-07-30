@@ -1,10 +1,10 @@
-const CACHE_NAME = 'starlink-keeper-v1';
+const CACHE_NAME = 'starlink-keeper-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html'
 ];
 
-// Cache core files on installation step
+// Cache core UI shell elements during initialization
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -13,7 +13,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Clean outdated caches 
+// Purge obsolete network caches automatically across deployment versions
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -22,22 +22,34 @@ self.addEventListener('activate', (event) => {
           if (key !== CACHE_NAME) return caches.delete(key);
         })
       );
-    }).then(() => self.skipWaiting())
+    }).then(() => self.clients.claim())
   );
 });
 
-// Network intercept routing strategy
+// High-Performance Network Interceptor
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // CRITICAL: Force the real network to handle 'ping.txt' request pulses.
-  // Do not let the Service Worker mock it from the browser's cache storage.
+  // CRITICAL RESOLVER PATH: Force raw physical network interface queries for 'ping.txt'
   if (url.pathname.includes('ping.txt')) {
-    event.respondWith(fetch(event.request));
+    event.respondWith(
+      fetch(event.request, { mode: 'same-origin' })
+        .then((response) => {
+          // If the network responds but it's a server error status, pass it to trigger the drop event handler
+          if (!response.ok) {
+            return new Response("Offline", { status: 503, statusText: "Service Unavailable" });
+          }
+          return response;
+        })
+        .catch(() => {
+          // If a true physical link micro-drop occurs, return a distinct broken status code to the client script
+          return new Response("Network Down", { status: 404, statusText: "Not Found" });
+        })
+    );
     return;
   }
 
-  // Use a Cache-First approach for UI resources so the program boots instantly while completely offline
+  // Fallback cache routing logic for absolute offline system boot capabilities
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       return cachedResponse || fetch(event.request);
