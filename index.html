@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> forced Starlink Keeper</title>
+    <title>forced Starlink Keeper</title>
     
-    <!-- Hard-warming global backbone networks to accelerate everyday browser page loading speeds -->
     <link rel="dns-prefetch" href="https://8.8.8">
     <link rel="dns-prefetch" href="https://1.1.1">
     <link rel="preconnect" href="https://1.1.1" crossorigin>
-    <link rel="preconnect" href="https://gstatic.com" crossorigin>
     
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; text-align: center; padding: 20px; margin: 0; }
@@ -18,41 +16,42 @@
         .status { font-size: 20px; color: #238636; font-weight: bold; margin: 10px 0; }
         .latency-badge { font-size: 14px; color: #8b949e; background: #21262d; padding: 4px 10px; border-radius: 20px; display: inline-block; margin-bottom: 15px; border: 1px solid #30363d; }
         
-        .booster-panel { background: #0d1117; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #30363d; display: flex; flex-direction: column; gap: 12px; text-align: left; }
+        .panel-box { background: #0d1117; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #30363d; text-align: left; display: flex; flex-direction: column; gap: 12px; }
         .panel-title { font-size: 14px; font-weight: bold; color: #58a6ff; margin: 0 0 5px 0; border-bottom: 1px solid #21262d; padding-bottom: 5px; }
-        .metric-row { display: flex; justify-content: space-between; font-size: 13px; color: #8b949e; }
-        .metric-val { color: #f0f6fc; font-family: monospace; font-weight: bold; }
-        .optimize-alert { color: #db6d28 !important; }
+        .audio-controls { display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #8b949e; }
+        
+        input[type="file"] { font-size: 12px; color: #8b949e; }
+        input[type="range"] { accent-color: #58a6ff; width: 100%; cursor: pointer; }
+        audio { width: 100%; margin-top: 5px; }
 
-        .log-container { text-align: left; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 15px; height: 220px; overflow-y: auto; font-family: monospace; font-size: 13px; color: #8b949e; }
+        .log-container { text-align: left; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 15px; height: 180px; overflow-y: auto; font-family: monospace; font-size: 13px; color: #8b949e; }
         .success { color: #3fb950; }
-        .reconnect { color: #db6d28; font-weight: bold; }
         .info { color: #58a6ff; }
         .fail { color: #f85149; }
-        requestAnimationFrame { display: none; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Starlink Connection Keeper <sup>ULTRA</sup></h1>
-        <p style="margin: 5px 0 15px 0; font-size: 14px; color: #8b949e;">Active Network Route & Latency Booster</p>
+        <p style="margin: 5px 0 15px 0; font-size: 14px; color: #8b949e;">Active Network Route & Audio Optimizer</p>
         
-        <div class="status" id="status-text">Warming DNS Sockets...</div>
+        <div class="status" id="status-text">Warming Sockets...</div>
         <div class="latency-badge" id="latency-text">Ping Response Time: -- ms</div>
 
-        <div class="booster-panel">
-            <div class="panel-title">📡 Real-Time Browser Network Optimization</div>
-            <div class="metric-row">
-                <span>DNS Socket State:</span>
-                <span class="metric-val" style="color: #3fb950;">HOT / PRE-PRIMED</span>
-            </div>
-            <div class="metric-row">
-                <span>Link Jitter Variance:</span>
-                <span class="metric-val" id="jitter-val">0 ms (Stable)</span>
-            </div>
-            <div class="metric-row">
-                <span>Calculated Ideal Hardware MTU:</span>
-                <span class="metric-val" id="mtu-val">Scanning...</span>
+        <!-- Audio Processing Engine Panel -->
+        <div class="panel-box">
+            <div class="panel-title">🔊 Browser Media Volume Optimizer</div>
+            <div class="audio-controls">
+                <label>Load Media File (.mp3, .wav, .ogg):</label>
+                <input type="file" id="audio-file" accept="audio/*">
+                
+                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                    <span>Tab Boost Level:</span>
+                    <span id="boost-val" style="color: #58a6ff; font-weight: bold;">100% (Standard)</span>
+                </div>
+                <input type="range" id="boost-slider" min="100" max="200" value="100">
+                
+                <audio id="media-player" controls></audio>
             </div>
         </div>
 
@@ -62,10 +61,14 @@
         const logBox = document.getElementById('log-box');
         const statusText = document.getElementById('status-text');
         const latencyText = document.getElementById('latency-text');
-        const jitterVal = document.getElementById('jitter-val');
-        const mtuVal = document.getElementById('mtu-val');
+        const audioFile = document.getElementById('audio-file');
+        const mediaPlayer = document.getElementById('media-player');
+        const boostSlider = document.getElementById('boost-slider');
+        const boostVal = document.getElementById('boost-val');
 
-        let latencyHistory = [];
+        let audioCtx = null;
+        let gainNode = null;
+        let sourceNode = null;
 
         function appendLog(message, type) {
             requestAnimationFrame(() => {
@@ -78,83 +81,59 @@
             });
         }
 
-        // Register Service Worker for offline baseline infrastructure stability
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(() => appendLog("Offline acceleration system operational.", "success"))
-                    .catch(err => appendLog(`Worker sync alert: ${err.message}`, "info"));
-            });
-        }
+        // Initialize advanced browser file routing hooks
+        audioFile.addEventListener('change', function() {
+            const file = this.files[0];
+            if (!file) return;
 
-        // Background Web Worker loop runs at 100% processing efficiency
-        const workerCode = `
-            setInterval(() => {
-                self.postMessage('pulse');
-            }, 10000);
-        `;
+            const fileURL = URL.createObjectURL(file);
+            mediaPlayer.src = fileURL;
+            appendLog(`Loaded audio asset: ${file.name}`, "info");
 
-        const blob = new Blob([workerCode], { type: 'application/javascript' });
-        const worker = new Worker(URL.createObjectURL(blob));
-        let networkWasDown = false;
+            // Setup custom Web Audio API filters upon the first user upload
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                gainNode = audioCtx.createGain();
+                
+                // Route player data directly through the boost modifier graph
+                sourceNode = audioCtx.createMediaElementSource(mediaPlayer);
+                sourceNode.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+            }
+        });
 
-        worker.onmessage = function(e) {
-            if (e.data === 'pulse') {
-                const startTime = performance.now();
+        // Dynamic volume processing listener
+        boostSlider.addEventListener('input', function() {
+            const multiplier = this.value / 100;
+            boostVal.innerText = `${this.value}%`;
+            
+            if (gainNode) {
+                // Adjust audio graph output coefficients smoothly
+                gainNode.gain.setValueAtTime(multiplier, audioCtx.currentTime);
+            }
+        });
 
-                // Injecting performance network compression headers via anti-cache calls
-                fetch(`./ping.txt?t=${Date.now()}`, { 
-                    cache: 'no-store',
-                    headers: { 'Accept-Encoding': 'gzip, deflate, br' }
-                })
-                .then((res) => {
-                    if (!res.ok) throw new Error("Link route dropped");
-                    
+        // Continuous network route maintenance engine
+        function checkLink() {
+            const startTime = performance.now();
+            fetch(`./ping.txt?t=${Date.now()}`, { cache: 'no-store' })
+                .then(res => {
+                    if (!res.ok) throw new Error();
                     const latency = Math.round(performance.now() - startTime);
                     latencyText.innerText = `Ping Response Time: ${latency} ms`;
                     statusText.innerText = "Active & Maintaining Connection";
                     statusText.style.color = "#238636";
-
-                    // Track latency history to analyze signal jitter and calculate optimal packet fragmentation bounds
-                    latencyHistory.push(latency);
-                    if (latencyHistory.length > 5) latencyHistory.shift();
-
-                    if (latencyHistory.length > 1) {
-                        let totalJitter = 0;
-                        for (let i = 1; i < latencyHistory.length; i++) {
-                            totalJitter += Math.abs(latencyHistory[i] - latencyHistory[i-1]);
-                        }
-                        const averageJitter = Math.round(totalJitter / (latencyHistory.length - 1));
-                        jitterVal.innerText = `${averageJitter} ms`;
-
-                        // Starlink optimization algorithm: If average jitter crosses 30ms, suggest satellite-optimized MTU boundaries
-                        if (averageJitter > 30) {
-                            mtuVal.innerText = "1420 (Optimize for Satellite Jitter)";
-                            mtuVal.className = "metric-val optimize-alert";
-                        } else {
-                            mtuVal.innerText = "1500 (Standard High Speed)";
-                            mtuVal.className = "metric-val";
-                        }
-                    }
-
-                    if (networkWasDown) {
-                        appendLog("⚡ Starlink connection verified! Forced system link RECONNECT.", "reconnect");
-                        networkWasDown = false;
-                    } else {
-                        appendLog(`Pulse validated: Socket paths warmed up. (${latency}ms)`, "success");
-                    }
+                    appendLog(`Pulse validated: Socket pathways hot. (${latency}ms)`, "success");
                 })
                 .catch(() => {
-                    statusText.innerText = "Network Dropped / Retrying...";
+                    statusText.innerText = "Connection Error / Retrying...";
                     statusText.style.color = "#f85149";
-                    latencyText.innerText = "Ping Response Time: Offline";
-                    networkWasDown = true;
-                    appendLog("Network Timeout detected. Routing pipeline retry...", "fail");
+                    appendLog("Network drop detected. Routing retry sequence...", "fail");
                 });
-            }
-        };
+        }
 
-        appendLog("Ultra Network Booster engine fully initialized.", "success");
+        setInterval(checkLink, 10000);
+        checkLink();
     </script>
 </body>
 </html>
