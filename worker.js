@@ -2,4 +2,4 @@
 setInterval(() => {
     // Post a message back to the main website window to trigger the network pulse
     self.postMessage('pulse');
-}, 100*2); // Strict 10-second background maintenance loop
+}, 100*55); // Strict 10-second background maintenance loop
